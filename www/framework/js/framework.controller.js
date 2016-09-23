@@ -147,37 +147,6 @@ fileUtils = "";
         	
         };
         
-        $scope.overrideIonicBackButton = function($viewScope, doCustomBack) {
-        	
-        	if(angular.isUndefined($viewScope) || angular.isUndefined(doCustomBack) || typeof doCustomBack != "function"){
-        		console.log("Pass valid argumets to overrideIonicBackButton");
-        		return;
-        	}
-        	console.log("In overrideIonicBackButton");
-    		// override soft back
-    		// framework calls $scope.$ionicGoBack when soft back button is pressed
-    		var oldSoftBack = $scope.$ionicGoBack;
-    		$scope.$ionicGoBack = function() {
-    			console.log("Custom back button called");
-    		    doCustomBack();
-    		};
-    		var deregisterSoftBack = function() {
-    		    $scope.$ionicGoBack = oldSoftBack;
-    		};
-
-    		// override hard back
-    		// registerBackButtonAction() returns a function which can be used to deregister it
-    		var deregisterHardBack = $ionicPlatform.registerBackButtonAction(
-    		    doCustomBack, 101
-    		);
-
-    		// cancel custom back behaviour
-    		$viewScope.$on('$destroy', function() {
-    		    deregisterHardBack();
-    		    deregisterSoftBack();
-    		});
-        	
-        };
         /**************************** Ionic Loading Indicator ***************************************/
         $scope.showLoadingIndicator = function(message) {
 
@@ -304,30 +273,35 @@ fileUtils = "";
         }
         
         /*************************************** Authenticate User ********************************************/
-       /*  $scope.authenticationService = function(param , successCallback, failureCallback) {
+		if(config.useWL) {
+			
+			$scope.authenticationService = function(param , successCallback, failureCallback) {
     		
-    		var requestObject = {};
-    		requestObject.record = param;
-    		
-    		var invocationData = {
-    	        adapter : config.authAdapter,
-    	        procedure : 'authenticateUser',
-    	        parameters : [requestObject]
-    	    };
-    		
-    		if(successCallback == undefined) 
-    			successCallback = function() {};
-    		if(failureCallback == undefined) 
-    			failureCallback = function() {};
+				var requestObject = {};
+				requestObject.record = param;
+				
+				var invocationData = {
+					adapter : config.authAdapter,
+					procedure : 'authenticateUser',
+					parameters : [requestObject]
+				};
+				
+				if(successCallback == undefined) 
+					successCallback = function() {};
+				if(failureCallback == undefined) 
+					failureCallback = function() {};
 
-    		var options = {
-    		    onSuccess : successCallback,
-    		    onFailure : failureCallback,
-    		    timeout   : config.connectionTimeout
-    		};
-    		
-    		WL.Client.invokeProcedure(invocationData,options);
-    	}; */
+				var options = {
+					onSuccess : successCallback,
+					onFailure : failureCallback,
+					timeout   : config.connectionTimeout
+				};
+				
+				WL.Client.invokeProcedure(invocationData,options);
+				
+			};
+		}
+       
     	
     	$scope.reloadApp = function() {
     		//WL.Client.reloadApp();
@@ -379,44 +353,53 @@ fileUtils = "";
     	};
     	
     	/************************************ Direct Update Check **************************************/
-        /* $scope.checkForDirectUpdate = function() {
-            WL.Client.checkForDirectUpdate();
-            WL.Client.login("wl_directUpdateRealm",{
-		 		onSuccess : function() {},
-		 		onFailure : function() {}
-		 	});
-        }; */
+		if(config.useWL) {
+			$scope.checkForDirectUpdate = function() {
+				WL.Client.checkForDirectUpdate();
+				WL.Client.login("wl_directUpdateRealm",{
+					onSuccess : function() {},
+					onFailure : function() {}
+				});
+			};
+		}
+       
 
         /**************************** Session Handling Functions  ***************************************/
-       /*  $scope.AuthRealmChallengeHandler = WL.Client.createChallengeHandler("UserIdentity");
+		if(config.useWL) {
+			
+			$scope.AuthRealmChallengeHandler = WL.Client.createChallengeHandler("UserIdentity");
+			$scope.AuthRealmChallengeHandler.isCustomResponse = function(response) {
+				if (!response || !response.responseJSON || response.responseText === null) {
+					return false;
+				}
+				if (typeof(response.responseJSON.authRequired) !== 'undefined') {
+					$scope.AuthRealmChallengeHandler.handleChallenge(response); //Unauthenticated access attempt
+				} else {
+					return false;
+				}
+			};
+			
+			$scope.AuthRealmChallengeHandler.handleChallenge = function(response) {
+				var authRequired = response.responseJSON.authRequired;
+				if (authRequired == true) {
+					if (Auth.isUserLoggedIn()) {
+						$scope.AuthRealmChallengeHandler.submitFailure();
+						WL.SimpleDialog.show($scope.getMessage("errorTitle"), $scope.getMessage("sessionExpiredMsg"), [{
+							text: 'OK',
+							handler: function() {
+							   WL.Client.reloadApp();
+							}
+						}]);
+					}
+				} else if (authRequired == false) {
+					$scope.AuthRealmChallengeHandler.submitFailure();
+				}
+			};
+			
+		}
+       /*   */
 
-        $scope.AuthRealmChallengeHandler.isCustomResponse = function(response) {
-            if (!response || !response.responseJSON || response.responseText === null) {
-                return false;
-            }
-            if (typeof(response.responseJSON.authRequired) !== 'undefined') {
-                $scope.AuthRealmChallengeHandler.handleChallenge(response); //Unauthenticated access attempt
-            } else {
-                return false;
-            }
-        }; */
-
-        /* $scope.AuthRealmChallengeHandler.handleChallenge = function(response) {
-            var authRequired = response.responseJSON.authRequired;
-            if (authRequired == true) {
-                if (Auth.isUserLoggedIn()) {
-                    $scope.AuthRealmChallengeHandler.submitFailure();
-                    WL.SimpleDialog.show($scope.getMessage("errorTitle"), $scope.getMessage("sessionExpiredMsg"), [{
-                        text: 'OK',
-                        handler: function() {
-                           WL.Client.reloadApp();
-                        }
-                    }]);
-                }
-            } else if (authRequired == false) {
-                $scope.AuthRealmChallengeHandler.submitFailure();
-            }
-        }; */
+        /* */
 
         /**************************** Device Back Button Handler  ***************************************/
         $scope.deviceBackButtonHandler = function() {
@@ -527,6 +510,13 @@ fileUtils = "";
     			options.date = new Date(parseInt(dateGetTime));
     		}
     		
+			var successCallback = function(date){
+    			if(ionic.Platform.isIOS()){
+        			document.body.classList.remove('keyboard-open');
+        		}
+    			callbackSuccess(date);
+    		};
+			
     		$scope.showDatePicker(options, function(date){
 				 if (date instanceof Date) {
 					 var formattedDate = $filter('date')(date, options.dateFormat);
@@ -540,7 +530,7 @@ fileUtils = "";
 						 $(element).attr('data-dategettime', date.getTime());
 					 }
 				 };
-    			callbackSuccess(date);
+    			successCallback(date);
     		}, callbackFailure);
     	};
         /******************************* Application Foreground Event *******************************/
@@ -567,45 +557,49 @@ fileUtils = "";
 		};
 		
 		/********************************** Adapter invocation code start ************************************/
-		/* $scope.invokeAdapterProcedure = function(obj) {
-			var Q = $.Deferred();
-			var adapterInvocationSucess = function(response) {
-				if(response.responseJSON != undefined && response.responseJSON.authRequired == true) {
-					console.log("User Session Expired");
-				}
-				else if(response.status == 200 && response.responseJSON && response.responseJSON.isSuccessful == true) {
-					Q.resolve(response);
-				}
-				else {
-					$scope.showadapterFailMessage(response);
-				}
-			};
-			var adapterInvocationFailure = function(response) {
-				if(response.responseJSON != undefined && response.responseJSON.authRequired == true) {
-					console.log("User Session Expired");
-				}
-				else {
-					Q.reject(response);
-				}
-			};
+		if(config.useWL) {
+		
+			$scope.invokeAdapterProcedure = function(obj) {
+				var Q = $.Deferred();
+				var adapterInvocationSucess = function(response) {
+					if(response.responseJSON != undefined && response.responseJSON.authRequired == true) {
+						console.log("User Session Expired");
+					}
+					else if(response.status == 200 && response.responseJSON && response.responseJSON.isSuccessful == true) {
+						Q.resolve(response);
+					}
+					else {
+						$scope.showadapterFailMessage(response);
+					}
+				};
+				var adapterInvocationFailure = function(response) {
+					if(response.responseJSON != undefined && response.responseJSON.authRequired == true) {
+						console.log("User Session Expired");
+					}
+					else {
+						Q.reject(response);
+					}
+				};
+				
+				var invocationData = {
+					adapter : obj.adapter,
+					procedure : obj.procedure,
+					parameters : [ obj.param ]
+				};
+				var options = {
+					onSuccess : adapterInvocationSucess,
+					onFailure : adapterInvocationFailure,
+					timeout   : config.connectionTimeout
+				};
+				
+				console.log(invocationData);
+				
+				WL.Client.invokeProcedure(invocationData, options);
+				
+				return Q;
+			}; 
 			
-			var invocationData = {
-				adapter : obj.adapter,
-				procedure : obj.procedure,
-				parameters : [ obj.param ]
-			};
-			var options = {
-			    onSuccess : adapterInvocationSucess,
-			    onFailure : adapterInvocationFailure,
-			    timeout   : config.connectionTimeout
-			};
-			
-			console.log(invocationData);
-			
-			WL.Client.invokeProcedure(invocationData, options);
-			
-			return Q;
-		}; */
+		}
 		/********************************** Adapter invocation code end ************************************/
 		
 		/********************************** Lazy loading code start  ************************************/
