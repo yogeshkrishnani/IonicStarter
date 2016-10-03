@@ -57,7 +57,9 @@ fileUtils = "";
         	$state.go(view);
         	
         	if( $scope.config.isNativePageTransitionEnabled() ) {
-        		NativePageTransition.showNextPage(options, callback);
+				$timeout(function() {
+					NativePageTransition.showNextPage(options, callback);
+				});
         	}
         	else {
         		if (typeof callback == "function") callback();
@@ -111,7 +113,9 @@ fileUtils = "";
             }
             
             if( $scope.config.isNativePageTransitionEnabled() ) {
-        		NativePageTransition.showPrevPage(options, callback);
+				$timeout(function() {
+					NativePageTransition.showPrevPage(options, callback);
+				});
         	}
         	else {
         		if (typeof callback == "function") callback();
